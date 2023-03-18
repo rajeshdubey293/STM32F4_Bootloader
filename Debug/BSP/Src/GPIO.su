@@ -1,0 +1,5 @@
+../BSP/Src/GPIO.c:10:6:GPIO_Init	40	static
+../BSP/Src/GPIO.c:21:6:Clock_Enable	48	static
+../BSP/Src/GPIO.c:43:13:GPIO_Pin_Toggle	16	static
+../BSP/Src/GPIO.c:47:13:GPIO_Pin_Set	16	static
+../BSP/Src/GPIO.c:51:13:GPIO_Pin_Reset	16	static

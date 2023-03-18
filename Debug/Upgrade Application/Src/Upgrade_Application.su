@@ -1,0 +1,7 @@
+../Upgrade Application/Src/Upgrade_Application.c:13:9:Execute_Mem_Write	40	static
+../Upgrade Application/Src/Upgrade_Application.c:30:9:Execute_Flash_Erase	48	static
+../Upgrade Application/Src/Upgrade_Application.c:75:10:Calculate_Authentication_Key	24	static
+../Upgrade Application/Src/Upgrade_Application.c:81:9:Bootloader_Verify_CRC	40	static
+../Upgrade Application/Src/Upgrade_Application.c:101:6:Boot_User_Application	24	static,ignoring_inline_asm
+../Upgrade Application/Src/Upgrade_Application.c:124:9:Calculate_Num_Of_Sector	32	static
+../Upgrade Application/Src/Upgrade_Application.c:150:6:CRC_Init	8	static

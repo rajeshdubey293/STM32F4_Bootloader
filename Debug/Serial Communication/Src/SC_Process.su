@@ -1,0 +1,3 @@
+../Serial Communication/Src/SC_Process.c:27:6:SC_Process	8	static
+../Serial Communication/Src/SC_Process.c:67:6:Show_Bootloader_Menu	8	static
+../Serial Communication/Src/SC_Process.c:76:16:Authenticated_User	8	static
