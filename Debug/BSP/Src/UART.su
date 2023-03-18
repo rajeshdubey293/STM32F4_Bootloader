@@ -1,7 +1,0 @@
-../BSP/Src/UART.c:14:6:UART_Init	8	static
-../BSP/Src/UART.c:31:6:Print_Msg	96	static
-../BSP/Src/UART.c:41:13:HAL_UART_RxCpltCallback	16	static
-../BSP/Src/UART.c:46:13:UART_Receive	16	static
-../BSP/Src/UART.c:50:13:UART_Interrupt_Start	16	static
-../BSP/Src/UART.c:54:13:UART_Get_Rx_Byte	16	static
-../BSP/Src/UART.c:60:15:UART_Rx_Byte_Available	4	static
