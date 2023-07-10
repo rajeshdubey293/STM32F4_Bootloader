@@ -163,5 +163,6 @@ void TIM6_DAC_IRQHandler(void)
 }
 void USART1_IRQHandler(void)
 {
-	HAL_UART_IRQHandler(&huart1);
+	//HAL_UART_IRQHandler(&huart1);
+	Uart_isr(&huart1);
 }

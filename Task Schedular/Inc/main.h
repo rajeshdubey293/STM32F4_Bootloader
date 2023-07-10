@@ -39,11 +39,13 @@ extern "C" {
 #include "GPIO.h"
 #include "TIM.h"
 #include "UART.h"
+#include "UartRingbuffer.h"
 
 
 /* Application Includes */
 #include "Upgrade_Application.h"
 #include "SC_Process.h"
+
 
 /*   Driver Function */
 

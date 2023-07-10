@@ -23,16 +23,18 @@ char *user_Name = "admin";
 char *user_Pass = "password";
 
 char *sw_Version = "V1.0 Beta\r\n";
-
 void SC_Process(void)
 {
+	HAL_StatusTypeDef status;
 	if(Authenticated_User() != USER_AUTHENICATED)
 	{
 		return;
 	}
-	if(UART_Rx_Byte_Available())
+	//if(UART_Rx_Byte_Available())
+	if(IsDataAvailable())
 	{
-		UART_Get_Rx_Byte(&sc_Rx_Buffer, 1);
+		//UART_Get_Rx_Byte(&sc_Rx_Buffer, 1);
+		sc_Rx_Buffer = Uart_read();
 		if(sc_Option == BOOTLOADER_MENU)
 		{
 			sc_Option = sc_Rx_Buffer;
@@ -40,12 +42,21 @@ void SC_Process(void)
 		switch(sc_Option)
 		{
 		case UPGRADE_APP:
-			Execute_Flash_Erase(5, 1);
-			Boot_User_Application();
+			Execute_Flash_Erase(FLASH_SECTOR6_BASE_ADDRESS, 2);
+			Upgrade_Application();
+			sc_Option = BOOTLOADER_MENU;
 			break;
 		case BOOT_APP:
-			Print_Msg("Booting into User Application \r\n");
-			Execute_Flash_Erase(5, 1);
+			status = Execute_Flash_Erase(UPGRADE_APPLICATION_CHECK_ADDR, 1);
+			__disable_irq();
+			if(status != HAL_OK)
+			{
+				GPIO_Pin_Set(RED_LED_PORT, RED_LED_PIN);
+				Print_Msg("Error: Reseting the Device\r\n");
+				//HAL_Delay(1000);
+				__NVIC_SystemReset();
+			}
+			Print_Msg("Bootloader:Booting into User Application \r\n");
 			Boot_User_Application();
 			break;
 		case EXIT:
@@ -75,13 +86,15 @@ void Show_Bootloader_Menu(void)
 }
 SC_User_Decode Authenticated_User(void)
 {
-	if(UART_Rx_Byte_Available())
+	//if(UART_Rx_Byte_Available())
+	if(IsDataAvailable())
 	{
 
 		switch(sc_User_State)
 		{
 		case USER_NAME:
-			UART_Get_Rx_Byte(&sc_Rx_Buffer, 1);
+			sc_Rx_Buffer = Uart_read();
+			//UART_Get_Rx_Byte(&sc_Rx_Buffer, 1);
 			if( (sc_Rx_Buffer != '\r') && (sc_Rx_Buffer != '\n'))
 			{
 				Print_Msg("%c", sc_Rx_Buffer);
@@ -96,7 +109,8 @@ SC_User_Decode Authenticated_User(void)
 			}
 			break;
 		case USER_PASS:
-			UART_Get_Rx_Byte(&sc_Rx_Buffer, 1);
+			//UART_Get_Rx_Byte(&sc_Rx_Buffer, 1);
+			sc_Rx_Buffer = Uart_read();
 			if( (sc_Rx_Buffer != '\r') && (sc_Rx_Buffer != '\n'))
 			{
 				user_Pass_Array[i++] = sc_Rx_Buffer;
@@ -123,7 +137,8 @@ SC_User_Decode Authenticated_User(void)
 			sc_User_State = USER_AUTHENICATED;
 			break;
 		case USER_UNKNOWN:
-			UART_Get_Rx_Byte(&sc_Rx_Buffer, 1);
+			//UART_Get_Rx_Byte(&sc_Rx_Buffer, 1);
+			sc_Rx_Buffer = Uart_read();
 			Print_Msg("User Name: ");
 			sc_User_State = USER_NAME;
 			i = 0;

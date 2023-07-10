@@ -1,3 +1,4 @@
 /.settings
 /Debug
 STM32F4_Bootloader.launch
+STM32F4_Bootloader Debug.launch

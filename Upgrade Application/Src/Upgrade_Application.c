@@ -10,67 +10,44 @@
 
 CRC_HandleTypeDef hcrc;
 
-uint8_t Execute_Mem_Write(uint8_t *pBuffer, uint32_t mem_Address, uint32_t len)
+static uint32_t GetSector(uint32_t Address);
+
+uint8_t Execute_Mem_Write(uint8_t *pBuffer, uint32_t mem_address, uint32_t len)
 {
-	uint8_t status_Flash = HAL_OK;
+	uint8_t status_flash = HAL_OK;
 
 	//We have to unlock flash module to get control of registers
 	HAL_FLASH_Unlock();
-
-	for(uint32_t i = 0 ; i < len ; i++)
+	for(uint32_t i = 0 ; i < len ; i += 1)
 	{
 		//Here we program the flash byte by byte
-		status_Flash = HAL_FLASH_Program(FLASH_TYPEPROGRAM_BYTE,mem_Address+i,pBuffer[i] );
+		status_flash = HAL_FLASH_Program(FLASH_TYPEPROGRAM_BYTE,mem_address+i,pBuffer[i] );
 	}
 	HAL_FLASH_Lock();
 
-	return status_Flash;
+	return status_flash;
 }
-
-uint8_t Execute_Flash_Erase(uint8_t sector_Number , uint8_t number_Of_Sector)
+uint8_t Execute_Flash_Erase(uint32_t address , uint8_t number_Of_Sector)
 {
-	//we have totally 12 sectors in STM32F407VG mcu .. sector[0 to 11]
-	//number_of_sector has to be in the range of 0 to 11
-	// if sector_number = 0xff , that means mass erase !
-	//Code needs to modified if your MCU supports more flash sectors
-	FLASH_EraseInitTypeDef flash_Erase_Handle;
-	uint32_t sector_Error;
+	uint32_t FirstSector = 0, sector_Error = 0;
+	FLASH_EraseInitTypeDef flash_Erase_Handle = {0};
 	HAL_StatusTypeDef status_Flash;
 
+	/* Get the 1st sector to erase */
+	FirstSector = GetSector(address);
 
-	if( number_Of_Sector > 12 )
-		return INVALID_SECTOR;
+	flash_Erase_Handle.TypeErase = FLASH_TYPEERASE_SECTORS;
+	flash_Erase_Handle.Sector = FirstSector; // this is the initial sector
+	flash_Erase_Handle.NbSectors = number_Of_Sector;
+	flash_Erase_Handle.Banks = FLASH_BANK_2;
+	flash_Erase_Handle.VoltageRange = FLASH_VOLTAGE_RANGE_3;  // our mcu will work on this voltage range
 
-	if( (sector_Number == 0xff ) || (sector_Number <= 11) )
-	{
-		if(sector_Number == (uint8_t) 0xff)
-		{
-			flash_Erase_Handle.TypeErase = FLASH_TYPEERASE_MASSERASE;
-		}else
-		{
-			/*Here we are just calculating how many sectors needs to erased */
-			uint8_t remanining_Sector = 12 - sector_Number;
-			if( number_Of_Sector > remanining_Sector)
-			{
-				number_Of_Sector = remanining_Sector;
-			}
-			flash_Erase_Handle.TypeErase = FLASH_TYPEERASE_SECTORS;
-			flash_Erase_Handle.Sector = sector_Number; // this is the initial sector
-			flash_Erase_Handle.NbSectors = number_Of_Sector;
-		}
-		flash_Erase_Handle.Banks = FLASH_BANK_1;
+	/*Get access to touch the flash registers */
+	HAL_FLASH_Unlock();
+	status_Flash = HAL_FLASHEx_Erase(&flash_Erase_Handle, &sector_Error);
+	HAL_FLASH_Lock();
 
-		/*Get access to touch the flash registers */
-		HAL_FLASH_Unlock();
-		flash_Erase_Handle.VoltageRange = FLASH_VOLTAGE_RANGE_3;  // our mcu will work on this voltage range
-		status_Flash = (uint8_t) HAL_FLASHEx_Erase(&flash_Erase_Handle, &sector_Error);
-		HAL_FLASH_Lock();
-
-		return status_Flash;
-	}
-
-
-	return INVALID_SECTOR;
+	return status_Flash;
 }
 uint32_t Calculate_Authentication_Key(uint32_t key)
 {
@@ -156,4 +133,189 @@ void CRC_Init(void)
 	}
 
 }
+void Upgrade_Application(void)
+{
+	uint8_t input_Buffer[64] = {0};
+	uint8_t data_buffer[50] = {0};
+	//uint8_t *data_Buffer = malloc(46000);
+	//memset(data_Buffer, 0, 46000);
+	uint32_t dest_Address = 0, i = 0;
+	uint8_t data_Len= 0;
+	uint32_t total_Packet_Len = 0;
+	char rx_Byte;
+	int status = 1;
+	Print_Msg("Send Binary File\r\n");
+	while(status != 0)
+	{
+		//if(UART_Rx_Byte_Available())
+		if(IsDataAvailable())
+		{
+			//UART_Get_Rx_Byte(&rx_Byte, 1);
+			rx_Byte = Uart_read();
+			input_Buffer[i] = rx_Byte;
+			if(rx_Byte == '\r')
+			{
+				status = Extract_Srecord_file((char*)&input_Buffer, (uint8_t*)data_buffer, &dest_Address, &data_Len);
+				if(status != -1)
+					Execute_Mem_Write(data_buffer, dest_Address, data_Len);
+				memset(data_buffer, 0, sizeof(data_buffer));
+				total_Packet_Len += data_Len;
+				i = 0;
+				continue;
+			}
+			i++;
+		}
+	}
+	Print_Msg("Binary File is Received, total Count = %d bytes\r\n", total_Packet_Len);
+	//	Execute_Mem_Write(data_buffer, FLASH_SECTOR6_BASE_ADDRESS, total_Packet_Len);
+	//free(data_Buffer);
 
+
+}
+int Extract_Srecord_file(char *input_Bufer, uint8_t *data_Buffer, uint32_t *dest_Address, uint8_t *data_len)
+{
+	int type, count, i;
+	unsigned int addr;
+	/* Check for start code */
+	if (input_Bufer[0] != 'S')
+	{
+		//Print_Msg("Error: invalid format\r\n");
+		return -1;
+	}
+
+	/* Read record type */
+	sscanf((char*)&input_Bufer[1], "%1x", &type);
+	//Print_Msg("type = %d\r\n", type);
+
+	/* Read record count */
+	sscanf((char*)&input_Bufer[2], "%2x", &count);
+
+	/* Read record address */
+	switch (type)
+	{
+	case 0:
+		return -1;
+	case 3:
+		sscanf((char*)&input_Bufer[4], "%8x", &addr);
+		*dest_Address = addr;
+		break;
+	case 7:
+		return 0;
+	}
+
+	/* Read data */
+	for (i = 0; i < count - 5; i++)
+	{
+		sscanf((char*)&input_Bufer[8 + 2 * (i + (type - 1))], "%2x", (unsigned int*)&data_Buffer[i]);
+	}
+	*data_len = i;
+	return 1;
+}
+/**
+ * @brief  Gets the sector of a given address
+ * @param  None
+ * @retval The sector of a given address
+ */
+static uint32_t GetSector(uint32_t Address)
+{
+	uint32_t sector = 0;
+
+	if((Address < ADDR_FLASH_SECTOR_1) && (Address >= ADDR_FLASH_SECTOR_0))
+	{
+		sector = FLASH_SECTOR_0;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_2) && (Address >= ADDR_FLASH_SECTOR_1))
+	{
+		sector = FLASH_SECTOR_1;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_3) && (Address >= ADDR_FLASH_SECTOR_2))
+	{
+		sector = FLASH_SECTOR_2;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_4) && (Address >= ADDR_FLASH_SECTOR_3))
+	{
+		sector = FLASH_SECTOR_3;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_5) && (Address >= ADDR_FLASH_SECTOR_4))
+	{
+		sector = FLASH_SECTOR_4;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_6) && (Address >= ADDR_FLASH_SECTOR_5))
+	{
+		sector = FLASH_SECTOR_5;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_7) && (Address >= ADDR_FLASH_SECTOR_6))
+	{
+		sector = FLASH_SECTOR_6;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_8) && (Address >= ADDR_FLASH_SECTOR_7))
+	{
+		sector = FLASH_SECTOR_7;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_9) && (Address >= ADDR_FLASH_SECTOR_8))
+	{
+		sector = FLASH_SECTOR_8;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_10) && (Address >= ADDR_FLASH_SECTOR_9))
+	{
+		sector = FLASH_SECTOR_9;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_11) && (Address >= ADDR_FLASH_SECTOR_10))
+	{
+		sector = FLASH_SECTOR_10;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_12) && (Address >= ADDR_FLASH_SECTOR_11))
+	{
+		sector = FLASH_SECTOR_11;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_13) && (Address >= ADDR_FLASH_SECTOR_12))
+	{
+		sector = FLASH_SECTOR_12;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_14) && (Address >= ADDR_FLASH_SECTOR_13))
+	{
+		sector = FLASH_SECTOR_13;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_15) && (Address >= ADDR_FLASH_SECTOR_14))
+	{
+		sector = FLASH_SECTOR_14;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_16) && (Address >= ADDR_FLASH_SECTOR_15))
+	{
+		sector = FLASH_SECTOR_15;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_17) && (Address >= ADDR_FLASH_SECTOR_16))
+	{
+		sector = FLASH_SECTOR_16;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_18) && (Address >= ADDR_FLASH_SECTOR_17))
+	{
+		sector = FLASH_SECTOR_17;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_19) && (Address >= ADDR_FLASH_SECTOR_18))
+	{
+		sector = FLASH_SECTOR_18;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_20) && (Address >= ADDR_FLASH_SECTOR_19))
+	{
+		sector = FLASH_SECTOR_19;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_21) && (Address >= ADDR_FLASH_SECTOR_20))
+	{
+		sector = FLASH_SECTOR_20;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_22) && (Address >= ADDR_FLASH_SECTOR_21))
+	{
+		sector = FLASH_SECTOR_21;
+	}
+	else if((Address < ADDR_FLASH_SECTOR_23) && (Address >= ADDR_FLASH_SECTOR_22))
+	{
+		sector = FLASH_SECTOR_22;
+	}
+	else/*(Address < FLASH_END_ADDR) && (Address >= ADDR_FLASH_SECTOR_23))*/
+	{
+		sector = FLASH_SECTOR_23;
+	}
+
+	return sector;
+}

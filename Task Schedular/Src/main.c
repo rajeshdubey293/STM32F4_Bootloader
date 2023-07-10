@@ -9,7 +9,7 @@ char tempValue[10] = {0};
 
 extern char LED1_ON_FLAG;
 extern char LED2_ON_FLAG;
-uint8_t *app_upgrade_check = NULL;
+uint32_t *app_upgrade_check = NULL;
 int main(void)
 {
 	HAL_Init();
@@ -17,15 +17,19 @@ int main(void)
 	Timer_Init(TIM6);
 	UART_Init();
 	CRC_Init();
-
-	GPIO_Init(GPIOG, GPIO_PIN_14);
-	GPIO_Init(GPIOG, GPIO_PIN_13);
+	Ringbuf_init();
+	GPIO_Init(RED_LED_PORT, RED_LED_PIN, OUTPUT);
+	GPIO_Init(GREEN_LED_PORT, GREEN_LED_PIN, OUTPUT);
+	GPIO_Init(USER_INPUT_PORT, USER_INPUT_PIN, INPUT);
 
 	Timer_Start_IT();
 	UART_Interrupt_Start(&rx_Buffer);
-	app_upgrade_check = (uint8_t*)UPGRADE_APPLICATION_CHECK_ADDR;
-	if(*app_upgrade_check == 0XFF)
+	app_upgrade_check = (uint32_t*)UPGRADE_APPLICATION_CHECK_ADDR;
+	if( (*app_upgrade_check == 0xFFFFFFFF))
+	{
+		Print_Msg("Bootloader:Booting into Application\r\n");
 		Boot_User_Application();
+	}
 	else
 	{
 		Print_Msg("******* Welcome to STM32F4 Boot-loader *******\r\n\n");
@@ -33,7 +37,6 @@ int main(void)
 		/* Loop forever */
 		for(;;)
 		{
-
 			if(SysTick_Get() > 0)
 			{
 
@@ -44,13 +47,12 @@ int main(void)
 				if(LED1_ON_FLAG == 1)
 				{
 					LED1_ON_FLAG = 0;
-					GPIO_Pin_Toggle(GPIOG, GPIO_PIN_13);
+					GPIO_Pin_Toggle(RED_LED_PORT, RED_LED_PIN);
 				}
-
 				if(LED2_ON_FLAG == 1)
 				{
 					LED2_ON_FLAG = 0;
-					GPIO_Pin_Toggle(GPIOG, GPIO_PIN_14);
+					GPIO_Pin_Toggle(GREEN_LED_PORT, GREEN_LED_PIN);
 				}
 				if(sc_Counter >= 10)
 				{
@@ -81,7 +83,7 @@ void SystemClock_Config(void)
 	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
 	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
 	RCC_OscInitStruct.PLL.PLLM = 4;
-	RCC_OscInitStruct.PLL.PLLN = 80;
+	RCC_OscInitStruct.PLL.PLLN = 180;
 	RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
 	RCC_OscInitStruct.PLL.PLLQ = 7;
 	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
