@@ -2,3 +2,10 @@
 /Debug
 STM32F4_Bootloader.launch
 STM32F4_Bootloader Debug.launch
+/.vs
+/.vscode
+/build
+/cmake
+CMakeLists.txt
+CMakePresets.json
+vcpkg-configuration.json

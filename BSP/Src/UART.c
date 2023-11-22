@@ -38,15 +38,23 @@ void Print_Msg(char *format,...)
 	HAL_UART_Transmit(&huart1,(uint8_t *)tx_Buffer, strlen(tx_Buffer), 10);
 	va_end(args);
 }
+#if 1
 inline void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
 	byte_Available = 1;
 	HAL_UART_Receive_IT(&huart1, (uint8_t*)&rx_Buffer, 1);
 }
+#endif
 inline void UART_Receive(char *tmp_Rx_Buffer)
 {
 	HAL_UART_Receive(&huart1, (uint8_t*)tmp_Rx_Buffer, 1, 100);
 }
+#if 0
+inline void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+{
+	HAL_UARTEx_ReceiveToIdle_IT(huart, (uint8_t*)&rx_Buffer, Size);
+}
+#endif
 inline void UART_Interrupt_Start(char *tmp_Rx_Buffer)
 {
 	HAL_UART_Receive_IT(&huart1, (uint8_t*)tmp_Rx_Buffer, 1);

@@ -79,3 +79,8 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef* hi2c)
 	}
 
 }
+void HAL_CRC_MspInit(CRC_HandleTypeDef *hcrc) {
+	if( hcrc->Instance == CRC ) {
+		__HAL_RCC_CRC_CLK_ENABLE();
+	}
+}

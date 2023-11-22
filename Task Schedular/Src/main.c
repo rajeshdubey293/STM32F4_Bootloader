@@ -9,9 +9,13 @@ char tempValue[10] = {0};
 
 extern char LED1_ON_FLAG;
 extern char LED2_ON_FLAG;
-uint32_t *app_upgrade_check = NULL;
-int main(void)
-{
+uint32_t *app_upgrade_check = (uint32_t*)APP_UPGRADE_CHECK_ADDR;
+uint32_t *reset_handler_addr = (uint32_t*)APP_FLASH_ADDR;
+uint32_t *app_total_len = (uint32_t*)APP_TOTAL_LENGTH_ADDR;
+
+Device_Boot_E device_boot;
+
+int main(void) {
 	HAL_Init();
 	SystemClock_Config();
 	Timer_Init(TIM6);
@@ -24,48 +28,28 @@ int main(void)
 
 	Timer_Start_IT();
 	UART_Interrupt_Start(&rx_Buffer);
-	app_upgrade_check = (uint32_t*)UPGRADE_APPLICATION_CHECK_ADDR;
-	if( (*app_upgrade_check == 0xFFFFFFFF))
-	{
-		Print_Msg("Bootloader:Booting into Application\r\n");
-		Boot_User_Application();
+	if( (*reset_handler_addr) == APP_EMPTY) {
+		Print_Msg("Bootloader:No Application Found\r\n");
+		Boot_Into_Bootloader();
 	}
-	else
-	{
-		Print_Msg("******* Welcome to STM32F4 Boot-loader *******\r\n\n");
-
-		/* Loop forever */
-		for(;;)
-		{
-			if(SysTick_Get() > 0)
-			{
-
-				led1_Counter += SysTick_Get();
-				led2_Counter += SysTick_Get();
-				sc_Counter += SysTick_Get();
-				SysTick_Set(0);
-				if(LED1_ON_FLAG == 1)
-				{
-					LED1_ON_FLAG = 0;
-					GPIO_Pin_Toggle(RED_LED_PORT, RED_LED_PIN);
-				}
-				if(LED2_ON_FLAG == 1)
-				{
-					LED2_ON_FLAG = 0;
-					GPIO_Pin_Toggle(GREEN_LED_PORT, GREEN_LED_PIN);
-				}
-				if(sc_Counter >= 10)
-				{
-					sc_Counter = 0;
-					SC_Process();
-				}
-			}
+	else if( (*app_upgrade_check) == APP_UPGRADE_PENDING) {
+		Boot_Into_Bootloader();
+	}
+	else {
+		if( Bootloader_Verify_CRC( (uint8_t*)reset_handler_addr, (uint32_t)(*app_total_len) ) == VERIFY_CRC_SUCCESS) {
+			Print_Msg("Bootloader:CRC Matched\r\n");
+			Print_Msg("Bootloader:Booting into Application\r\n");
+			//__disable_irq();
+			Boot_User_Application();
+		}
+		else {
+			Print_Msg("Bootloader:CRC Failed\r\n");
+			Boot_Into_Bootloader();
 		}
 	}
+	return 0;
 }
-
-void SystemClock_Config(void)
-{
+void SystemClock_Config(void) {
 	/*    Configure processor to run at full speed i.e 180Mhz */
 	RCC_OscInitTypeDef RCC_OscInitStruct = {0};
 	RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
@@ -86,15 +70,13 @@ void SystemClock_Config(void)
 	RCC_OscInitStruct.PLL.PLLN = 180;
 	RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
 	RCC_OscInitStruct.PLL.PLLQ = 7;
-	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-	{
+	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
 		Error_Handler();
 	}
 
 	/** Activate the Over-Drive mode
 	 */
-	if (HAL_PWREx_EnableOverDrive() != HAL_OK)
-	{
+	if (HAL_PWREx_EnableOverDrive() != HAL_OK) {
 		Error_Handler();
 	}
 
@@ -107,21 +89,42 @@ void SystemClock_Config(void)
 	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
 	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
-	{
+	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK) {
 		Error_Handler();
 	}
 }
 
-void Error_Handler(void)
-{
+void Error_Handler(void) {
 	/* User can add his own implementation to report the HAL error return state */
 	__disable_irq();
-	while (1)
-	{
+	while (1) {
 
 	}
 
 }
+void Boot_Into_Bootloader(void) {
+	Print_Msg("******* Welcome to STM32F4 Boot-loader *******\r\n\n");
 
+	/* Loop forever */
+	for(;;) {
+		if(SysTick_Get() > 0) {
 
+			led1_Counter += SysTick_Get();
+			led2_Counter += SysTick_Get();
+			sc_Counter += SysTick_Get();
+			SysTick_Set(0);
+			if(LED1_ON_FLAG == 1) {
+				LED1_ON_FLAG = 0;
+				GPIO_Pin_Toggle(RED_LED_PORT, RED_LED_PIN);
+			}
+			if(LED2_ON_FLAG == 1) {
+				LED2_ON_FLAG = 0;
+				GPIO_Pin_Toggle(GREEN_LED_PORT, GREEN_LED_PIN);
+			}
+			if(sc_Counter >= 10) {
+				sc_Counter = 0;
+				SC_Process();
+			}
+		}
+	}
+}

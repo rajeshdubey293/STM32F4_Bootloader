@@ -52,6 +52,9 @@ extern "C" {
 void Error_Handler(void);
 void SystemClock_Config(void);
 
+
+void Boot_Into_Bootloader(void);
+
 #ifdef __cplusplus
 }
 #endif

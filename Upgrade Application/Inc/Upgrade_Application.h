@@ -10,13 +10,18 @@
 
 #include "main.h"
 
-#define FLASH_SECTOR6_BASE_ADDRESS 		0x08040000U
+
+#define APP_UPGRADE_CHECK_ADDR			0x08080000U
+#define APP_TOTAL_LENGTH_ADDR			0x080A0000U
+
+#define APP_FLASH_ADDR					0x08100000U
+
 #define INVALID_SECTOR 					0x04
 #define VERIFY_CRC_FAIL    				1
 #define VERIFY_CRC_SUCCESS 				0
 #define FLASH_SECTOR_SIZE 				131072
+#define FLASH_BANK_SIZE					0x100000U
 
-#define UPGRADE_APPLICATION_CHECK_ADDR 0x08100000
 /* Base address of the Flash sectors Bank 1 */
 #define ADDR_FLASH_SECTOR_0     ((uint32_t)0x08000000) /* Base @ of Sector 0, 16 Kbytes */
 #define ADDR_FLASH_SECTOR_1     ((uint32_t)0x08004000) /* Base @ of Sector 1, 16 Kbytes */
@@ -45,14 +50,23 @@
 #define ADDR_FLASH_SECTOR_22     ((uint32_t)0x081C0000) /* Base @ of Sector 10, 128 Kbytes */
 #define ADDR_FLASH_SECTOR_23     ((uint32_t)0x081E0000) /* Base @ of Sector 11, 128 Kbytes */
 
+
+typedef enum Device_Boot {
+	APP_EMPTY = 0xFFFFFFFFU,
+	APP_UPGRADE_PENDING = 0xAABBCCDD,
+}Device_Boot_E;
+
 void CRC_Init(void);
 void Boot_User_Application(void);
 
 uint8_t Calculate_Num_Of_Sector(uint32_t len);
-uint8_t Bootloader_Verify_CRC (uint8_t *pData, uint32_t len, uint32_t crc_Host);
+uint8_t Bootloader_Verify_CRC (uint8_t *pData, uint32_t len);
 uint8_t Execute_Flash_Erase(uint32_t address , uint8_t number_Of_Sector);
 uint8_t Execute_Mem_Write(uint8_t *pBuffer, uint32_t mem_Address, uint32_t len);
 uint32_t Calculate_Authentication_Key(uint32_t key);
 void Upgrade_Application(void);
 int Extract_Srecord_file(char *input_Bufer, uint8_t *data_Buffer, uint32_t *dest_Address, uint8_t *data_len);
+void Calculate_App_CRC(uint8_t *addr, uint32_t len);
+uint32_t Get_Bank(uint32_t addr);
+
 #endif /* INC_UPGRADE_APPLICATION_H_ */

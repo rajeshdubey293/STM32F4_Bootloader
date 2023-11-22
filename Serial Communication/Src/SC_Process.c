@@ -23,6 +23,7 @@ char *user_Name = "admin";
 char *user_Pass = "password";
 
 char *sw_Version = "V1.0 Beta\r\n";
+
 void SC_Process(void)
 {
 	HAL_StatusTypeDef status;
@@ -42,22 +43,22 @@ void SC_Process(void)
 		switch(sc_Option)
 		{
 		case UPGRADE_APP:
-			Execute_Flash_Erase(FLASH_SECTOR6_BASE_ADDRESS, 2);
+			Execute_Flash_Erase(APP_FLASH_ADDR, 12);
 			Upgrade_Application();
+			Execute_Flash_Erase(APP_UPGRADE_CHECK_ADDR, 1);
 			sc_Option = BOOTLOADER_MENU;
 			break;
 		case BOOT_APP:
-			status = Execute_Flash_Erase(UPGRADE_APPLICATION_CHECK_ADDR, 1);
-			__disable_irq();
-			if(status != HAL_OK)
-			{
+			status = Execute_Flash_Erase(APP_UPGRADE_CHECK_ADDR, 1);
+			//__disable_irq();
+			if(status != HAL_OK) {
 				GPIO_Pin_Set(RED_LED_PORT, RED_LED_PIN);
-				Print_Msg("Error: Reseting the Device\r\n");
-				//HAL_Delay(1000);
+				Print_Msg("Bootloader:Error while Booting\r\n");
 				__NVIC_SystemReset();
 			}
-			Print_Msg("Bootloader:Booting into User Application \r\n");
-			Boot_User_Application();
+			else {
+				__NVIC_SystemReset();
+			}
 			break;
 		case EXIT:
 			sc_Option = BOOTLOADER_MENU_UNKNOWN;
@@ -72,82 +73,82 @@ void SC_Process(void)
 			Print_Msg("Invalid Options\r\n");
 			Show_Bootloader_Menu();
 			sc_Option = BOOTLOADER_MENU;
+			}
 		}
 	}
-}
-void Show_Bootloader_Menu(void)
-{
-	Print_Msg("******* STM32F4 Boot-loader Menu *******\r\n\n");
-	Print_Msg("\t1. Upgrade Application \r\n");
-	Print_Msg("\t2. Boot Application \r\n");
-	Print_Msg("\tx. Exit \r\n\n");
-	Print_Msg("*********************************\r\n\n");
-
-}
-SC_User_Decode Authenticated_User(void)
-{
-	//if(UART_Rx_Byte_Available())
-	if(IsDataAvailable())
+	void Show_Bootloader_Menu(void)
 	{
+		Print_Msg("******* STM32F4 Boot-loader Menu *******\r\n\n");
+		Print_Msg("\t1. Upgrade Application \r\n");
+		Print_Msg("\t2. Boot Application \r\n");
+		Print_Msg("\tx. Exit \r\n\n");
+		Print_Msg("*********************************\r\n\n");
 
-		switch(sc_User_State)
+	}
+	SC_User_Decode Authenticated_User(void)
+	{
+		//if(UART_Rx_Byte_Available())
+		if(IsDataAvailable())
 		{
-		case USER_NAME:
-			sc_Rx_Buffer = Uart_read();
-			//UART_Get_Rx_Byte(&sc_Rx_Buffer, 1);
-			if( (sc_Rx_Buffer != '\r') && (sc_Rx_Buffer != '\n'))
+
+			switch(sc_User_State)
 			{
-				Print_Msg("%c", sc_Rx_Buffer);
-				user_Name_Array[i++] = sc_Rx_Buffer;
-			}
-			else
-			{
-				user_Name_Array[i] = '\0';
-				sc_User_State = USER_PASS;
-				i = 0;
-				Print_Msg("\r\nUser Password: ");
-			}
-			break;
-		case USER_PASS:
-			//UART_Get_Rx_Byte(&sc_Rx_Buffer, 1);
-			sc_Rx_Buffer = Uart_read();
-			if( (sc_Rx_Buffer != '\r') && (sc_Rx_Buffer != '\n'))
-			{
-				user_Pass_Array[i++] = sc_Rx_Buffer;
-				sc_Rx_Buffer = '*';
-				Print_Msg("%c", sc_Rx_Buffer);
-			}
-			else
-			{
-				user_Pass_Array[i] = '\0';
-				if ( (strcmp(user_Name, user_Name_Array) == 0)
-						&& (strcmp(user_Pass, user_Pass_Array) == 0) )
+			case USER_NAME:
+				sc_Rx_Buffer = Uart_read();
+				//UART_Get_Rx_Byte(&sc_Rx_Buffer, 1);
+				if( (sc_Rx_Buffer != '\r') && (sc_Rx_Buffer != '\n'))
 				{
-					sc_User_State = USER_AUTHENICATED;
-					Print_Msg("\r\nUser Authenticated\r\n");
+					Print_Msg("%c", sc_Rx_Buffer);
+					user_Name_Array[i++] = sc_Rx_Buffer;
 				}
 				else
 				{
-					Print_Msg("\r\nWrong User Name and Password\r\n");
-					sc_User_State = USER_UNKNOWN;
+					user_Name_Array[i] = '\0';
+					sc_User_State = USER_PASS;
+					i = 0;
+					Print_Msg("\r\nUser Password: ");
 				}
+				break;
+			case USER_PASS:
+				//UART_Get_Rx_Byte(&sc_Rx_Buffer, 1);
+				sc_Rx_Buffer = Uart_read();
+				if( (sc_Rx_Buffer != '\r') && (sc_Rx_Buffer != '\n'))
+				{
+					user_Pass_Array[i++] = sc_Rx_Buffer;
+					sc_Rx_Buffer = '*';
+					Print_Msg("%c", sc_Rx_Buffer);
+				}
+				else
+				{
+					user_Pass_Array[i] = '\0';
+					if ( (strcmp(user_Name, user_Name_Array) == 0)
+							&& (strcmp(user_Pass, user_Pass_Array) == 0) )
+					{
+						sc_User_State = USER_AUTHENICATED;
+						Print_Msg("\r\nUser Authenticated\r\n");
+					}
+					else
+					{
+						Print_Msg("\r\nWrong User Name and Password\r\n");
+						sc_User_State = USER_UNKNOWN;
+					}
+				}
+				break;
+			case USER_AUTHENICATED:
+				sc_User_State = USER_AUTHENICATED;
+				break;
+			case USER_UNKNOWN:
+				//UART_Get_Rx_Byte(&sc_Rx_Buffer, 1);
+				sc_Rx_Buffer = Uart_read();
+				Print_Msg("User Name: ");
+				sc_User_State = USER_NAME;
+				i = 0;
+				break;
+			default:
+				sc_User_State = USER_UNKNOWN;
+				break;
 			}
-			break;
-		case USER_AUTHENICATED:
-			sc_User_State = USER_AUTHENICATED;
-			break;
-		case USER_UNKNOWN:
-			//UART_Get_Rx_Byte(&sc_Rx_Buffer, 1);
-			sc_Rx_Buffer = Uart_read();
-			Print_Msg("User Name: ");
-			sc_User_State = USER_NAME;
-			i = 0;
-			break;
-		default:
-			sc_User_State = USER_UNKNOWN;
-			break;
 		}
-	}
 
-	return sc_User_State;
-}
+		return sc_User_State;
+	}
