@@ -35,6 +35,7 @@
 extern int __io_putchar(int ch) __attribute__((weak));
 extern int __io_getchar(void) __attribute__((weak));
 
+register char * stack_ptr asm("sp");
 
 char *__env[1] = { 0 };
 char **environ = __env;
@@ -173,4 +174,28 @@ int _execve(char *name, char **argv, char **env)
   (void)env;
   errno = ENOMEM;
   return -1;
+}
+/**
+ _sbrk
+ Increase program data space. Malloc and related functions depend on this
+**/
+caddr_t _sbrk(int incr)
+{
+	extern char end asm("end");
+	static char *heap_end;
+	char *prev_heap_end;
+
+	if (heap_end == 0)
+		heap_end = &end;
+
+	prev_heap_end = heap_end;
+	if (heap_end + incr > stack_ptr)
+	{
+		errno = ENOMEM;
+		return (caddr_t) -1;
+	}
+
+	heap_end += incr;
+
+	return (caddr_t) prev_heap_end;
 }
